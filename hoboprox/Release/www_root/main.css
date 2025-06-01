@@ -1,0 +1,43 @@
+body {
+  background-color: #406060;
+}
+
+.bottom {
+  width:100%;
+}
+
+.chanlist {
+  background-color: #c0c0c0;
+  width:100%;
+}
+
+.chantextchan {
+  background-color: #ffffff;
+  width:100%;
+}
+.chantext {
+  background-color: #ffffff;
+  width:100%;
+}
+
+.entry {
+  background-color: #f0f0f0;
+  width:100%;
+}
+.textentry {
+  width:90%;
+}
+.textbutton {
+  width:10%;
+}
+.bigtable {
+  width:100%;
+  height:100%;
+  position: absolute;
+  top:0px;
+  right:0px;
+  bottom:0px;
+  left:0px;
+  border:0px;
+}
+

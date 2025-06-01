@@ -1,0 +1,279 @@
+<html>
+<head>
+<link href="./main.css" rel="stylesheet" type="text/css">
+<title>hoboprox</title>
+
+<meta name="viewport" content="width=device-width; initial-scale=1.0; maximum-scale=1.0;"> 
+
+<script src="main.js"></script>
+
+<script type="text/javascript">
+<!--
+
+var g_readptrs = new Array();
+var g_topptrs = new Array();
+var g_dirtychans = new Array();
+var g_curChan = "";
+var g_cds_target = "";
+var g_cds_data = "";
+
+function encodehtmlentities(s)
+{
+  var t = s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  if (1)
+  {
+   // this might be slow but hey
+    var a = t.split(" ");
+    var x;
+    for (x in a)
+    {
+      if (a[x].match(":\/\/")) 
+        a[x] = "<a href=\"" + a[x] + "\" target=\"blank\">" + a[x] + "</a>";
+      else if (a[x].match(/[-|\w]+\.[-|\w]+\//))
+        a[x] = "<a href=\"http://" + a[x] + "\" target=\"blank\">" + a[x] + "</a>";
+    }
+    t = a.join(" ");
+  }
+  else if (1)
+  {
+     t = t.replace(/\b((?:http\:\/\/)?([A-Za-z0-9][\w\/\.]+\.(com|org|net|fm)(\:\d+|\/|\?)[\w\/\.\=\?\&;#-]*\b))/g,
+                    "<a href=\"http://$2\" target=\"_blank\">$1</a>");
+
+  }
+  return t;
+}
+
+
+function get_element_from_chan(ch)
+{
+  return "chantext_" + ch.replace("#","__hash__");
+}
+
+function flushData()
+{
+  if (g_cds_target != "" && g_cds_data != "")
+  {
+    var tgt = document.getElementById(get_element_from_chan(g_cds_target));
+    if (!tgt)
+    {
+      tgt = document.createElement('div');
+      tgt.setAttribute("id",get_element_from_chan(g_cds_target));
+      tgt.setAttribute("class","chantextchan");
+      var ct = document.getElementById("chantext");
+      ct.appendChild(tgt);
+      tgt.style.display = g_curChan == g_cds_target ? "inline" : "none";
+    }
+    if (tgt) tgt.innerHTML += g_cds_data;
+    if (g_cds_target == g_curChan)
+    {
+      document.getElementById('entry').scrollIntoView();
+    }
+  }
+}
+
+function wwr_onreply(results)
+{
+  var ar = results.split("\n");
+  var x;
+  for (x in ar)
+  {
+    var tok = ar[x].split("\t");
+    if (tok.length > 0) switch(tok[0])
+    {
+       case "CD":
+         if (g_cds_target != "")
+         {
+           g_readptrs[g_cds_target] = parseInt(g_readptrs[g_cds_target]) + 1;
+	   if (g_cds_target != g_curChan) g_dirtychans[g_cds_target]=1;
+
+	   var p = tok[1].split(" ");
+	   if (p.length > 4)
+	   {
+	     // p[0] = timestamp
+	     // p[1] = sender
+	     // p[2] = cmd
+	     // p[3] = chan
+	     if (p[2] == "PRIVMSG" && p[4].charAt(0) == ':')
+	     {
+	       var sender =  p[1].replace(/!.*$/,"").replace(/@.*$/,"").replace(/^:/,"");
+	       var str = '<font size=-2 color="#5f5f5f">' + p[0] + '</font>';
+
+	       p.shift();
+	       p.shift();
+	       p.shift();
+	       p.shift();
+               var astr = encodehtmlentities(p.join(" ").replace(/^:/,""));
+	       if (astr.charCodeAt(0) == 1 && astr.substr(1,7) == "ACTION ")
+	       {
+	         astr = astr.substr(8).replace("\1","");
+		 str += '<font color="#2f2f7f"> * ' + sender + " " + astr + "</font>";
+	       }
+	       else str += '<font color="#2f2f2f"> &lt;' + sender + "&gt;</font> " + astr;
+    	       g_cds_data += str + "<BR>";
+	     }
+	     else
+	     {
+    	     //  g_cds_data += encodehtmlentities(p.join(" ")) + "<BR>";
+	     }
+	   }
+	 }
+       break;
+       case "CDS":
+          if (tok.length >= 3)
+	  {
+            flushData(); 
+            g_cds_data = "";
+            g_cds_target = tok[1];
+            g_readptrs[g_cds_target] = tok[2];
+	  }
+       break;
+       case "CL":
+         {
+	   var cl=document.getElementById("chanlist");
+	   cl.innerHTML = "";
+	   var i;
+           for (i = 1; i < tok.length; i+=2)
+	   {
+	     g_topptrs[tok[i]] = tok[i+1];
+
+             if (g_curChan == "") g_curChan = tok[i];
+
+	     if (tok[i] == g_curChan)
+	     {
+               g_dirtychans[g_curChan]=0;
+    	       cl.innerHTML += '&nbsp;<B>' + tok[i] + "</B>";
+	     }
+	     else 
+	     {
+	       var color = "#707070";
+	       var rp = g_readptrs[tok[i]];
+	       if (rp == undefined) rp = "0";
+               if (rp != g_topptrs[tok[i]]) g_dirtychans[tok[i]]=1;
+
+	       if (g_dirtychans[tok[i]]) color = "#f00000";
+
+    	       cl.innerHTML += '&nbsp;<a href="#entry" onClick="setChan(\'' + tok[i] + 
+	                       '\')"><font color="' + color + '">' + tok[i] + "</font></a>";
+	     }
+	   }
+	 }
+       break;
+    }
+  }
+}
+
+var g_lastreqtime=0;
+function runNewRequests()
+{
+  flushData(); 
+  g_cds_data = "";
+  g_cds_target = "";
+  var d = (new Date).getTime();
+  if (d < g_lastreqtime + 500)
+  {
+    return;
+  }
+  var x;
+  for (x in g_topptrs)
+  {
+//    if (x == g_curChan || g_curChan == "")
+    {
+      var t = g_readptrs[x];
+      if (t == undefined) t = "0";
+      if (t != g_topptrs[x])
+      {
+        g_wwr_req_list += "CD/" + x.replace("#",".") + "/" + t + "/200;";
+        g_lastreqtime = d;
+      }
+    }
+  }
+}
+
+function setChan(whichChan)
+{
+  if (whichChan != g_curChan)
+  {
+    g_curChan=whichChan;
+    wwr_req("CL");
+
+    var wn = document.getElementById(get_element_from_chan(whichChan));
+    var ct = document.getElementById("chantext");
+    for (x in ct.childNodes)
+    {
+      ct.childNodes[x].style.display = (ct.childNodes[x] == wn) ? "inline" : "none";
+    }
+    g_dirtychans[g_curChan]=0;
+  }
+}
+
+g_wwr_timer_freq = 50;
+wwr_req_recur("CL",2000);
+wwr_start();
+wwr_req("CL");
+
+function base16encode(str)
+{
+  var ret = "";
+  var x;
+  var tab = [ "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B", "C", "D", "E", "F" ];
+  for (x=0;x<str.length;x++)
+  {
+    var tmp = str.charCodeAt(x);
+    ret += tab[(tmp/16)&0xf];
+    ret += tab[tmp&0xf];
+  }
+  return ret;
+}
+
+function sendText()
+{
+  var ent = document.getElementById('textentry');
+  var str = ent.value;
+  if (ent && str.length >0)
+  {
+    if (str.charAt(0) != '/')
+    {
+      if (g_curChan != "")
+      {
+        wwr_req("SEND/0/" + base16encode("PRIVMSG " + g_curChan + " :" + str) + ";CL");
+      }
+    }
+    else if (str.substr(0,5) == "/raw ")
+    {
+      wwr_req("SEND/0/" + base16encode(str.substr(5)) + ";CL");
+    }
+    else if (str.substr(0,4) == "/me ")
+    {
+      wwr_req("SEND/0/" + base16encode("PRIVMSG " + g_curChan + " :\1" + "ACTION " + str.substr(4) + "\1") + ";CL");
+    }
+    ent.value = "";
+    document.getElementById('entry').scrollIntoView();
+  }
+}
+
+function handleKeyPress(e, t)
+{
+  var key=e.keyCode || e.which;
+  if (key==13){
+    sendText();
+  }
+}
+
+-->
+</script>
+</head>
+<body>
+<table class="bigtable"><tr height=100%><td valign=top class="chantext">
+<div id="chantext" class="chantext"></div>
+</td></tr>
+<tr><td valign=bottom>
+<div class="bottom"">
+<a name="entry"><div id="entry" class="entry">
+  <input id="textentry" type="text" onkeypress="handleKeyPress(event,this)" size="100%" class="textentry"><input type="button" value="send" onClick='sendText()' class="textbutton">
+</div>
+<div id="chanlist" class="chanlist"></div>
+</div>
+</td></tr>
+</table>
+</body>
+</html>
